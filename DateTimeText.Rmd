@@ -69,7 +69,7 @@ library(tidyr)
 library(scales)
 set.seed(1)
 
-library(dslab)
+library(dslabs)
 data("trump_tweets")
 names(trump_tweets)
 
@@ -175,6 +175,143 @@ android_iphone_or <- tweet_words %>%
            ( (iPhone + 0.5) / (sum(iPhone) - iPhone + 0.5)))
 android_iphone_or %>% arrange(desc(or))
 android_iphone_or %>% arrange(or)
+```
+```{r}
+android_iphone_or %>% filter(Android+iPhone > 100) %>%
+  arrange(desc(or))
+
+android_iphone_or %>% filter(Android+iPhone > 100) %>%
+  arrange(or)
+```
+```{r}
+
+sentiments  %>% distinct(sentiment)
+get_sentiments("bing")
+get_sentiments("afinn")
+get_sentiments("loughran") %>% count(sentiment)
+get_sentiments("nrc") %>% count(sentiment)
+```
+```{r}
+nrc <- get_sentiments("nrc") %>%
+  select(word,sentiment)
+tweet_words %>% inner_join(nrc,by ="word") %>%
+  select(source,word,sentiment) %>% sample_n(10)
+
+sentiment_counts <- tweet_words %>% 
+  left_join(nrc, by = "word") %>%
+  count(source,sentiment) %>%
+  spread(source, n) %>%
+  mutate(sentiment = replace_na(sentiment,replace = "none"))
+tweet_words %>% group_by(source) %>% summarize(n = n())
+
+sentiment_counts %>%
+  mutate(Android = Android / (sum(Android) - Android) , 
+         iPhone = iPhone / (sum(iPhone) - iPhone), 
+         or = Android/iPhone) %>%
+  arrange(desc(or))  
+
+library(broom)
+log_or <- sentiment_counts %>%
+  mutate( log_or = log( (Android / (sum(Android) - Android)) / (iPhone / (sum(iPhone) - iPhone))),
+          se = sqrt( 1/Android + 1/(sum(Android) - Android) + 1/iPhone + 1/(sum(iPhone) - iPhone)),
+          conf.low = log_or - qnorm(0.975)*se,
+          conf.high = log_or + qnorm(0.975)*se) %>%
+  arrange(desc(log_or))
+  
+log_or
+```
+```{r}
+log_or %>%
+  mutate(sentiment = reorder(sentiment, log_or),) %>%
+  ggplot(aes(x = sentiment, ymin = conf.low, ymax = conf.high)) +
+  geom_errorbar() +
+  geom_point(aes(sentiment, log_or)) +
+  ylab("Log odds ratio for association between Android and sentiment") +
+  coord_flip() 
+```
+```{r}
+android_iphone_or %>% inner_join(nrc) %>%
+  filter(sentiment == "disgust" & Android + iPhone > 10) %>%
+  arrange(desc(or))
+
+android_iphone_or %>% inner_join(nrc, by = "word") %>%
+  mutate(sentiment = factor(sentiment, levels = log_or$sentiment)) %>%
+  mutate(log_or = log(or)) %>%
+  filter(Android + iPhone > 10 & abs(log_or)>1) %>%
+  mutate(word = reorder(word, log_or)) %>%
+  ggplot(aes(word, log_or, fill = log_or < 0)) +
+  facet_wrap(~sentiment, scales = "free_x", nrow = 2) + 
+  geom_bar(stat="identity", show.legend = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+```{r}
+library(dslabs)
+library(lubridate)
+options(digits = 3)    # 3 significant digits
+
+data("brexit_polls")
+head(brexit_polls)
+brexit_polls %>% filter(month(startdate)==4)
+brexit_polls %>% filter(round_date(enddate,unit = "week")=="2016-06-12")
+ sum(month(brexit_polls$startdate) == 4)
+ sum(round_date(brexit_polls$enddate, unit = "week") == "2016-06-12")
+
+brexit_polls %>% mutate(weekday = weekdays(enddate)) %>%
+  count(weekday) %>%
+  arrange(desc(n))
+
+table(weekdays(brexit_polls$enddate))  
+
+data(movielens)
+
+movielens %>% mutate(year =year(as_datetime(timestamp))) %>%
+  count(year) %>%
+  arrange(desc(n))
+
+dates <- as_datetime(movielens$timestamp)
+reviews_by_year <- table(year(dates))    # count reviews by year
+names(which.max(reviews_by_year))    # name of year with most reviews
+
+movielens %>% mutate(hr =hour(as_datetime(timestamp))) %>%
+  count(hr) %>%
+  arrange(desc(n))
+```
+```{r}
+library(tidyverse)
+library(gutenbergr)
+library(stringr)
+library(tidytext)
+options(digits = 3)
+
+gutenberg_metadata %>% filter(str_detect(title, "Pride and Prejudice"))
+
+sum(str_detect(gutenberg_metadata$title, "Declaration of Independence")==TRUE)
+sum(str_detect(gutenberg_metadata$title, "Pride and Prejudice")==TRUE)
+
+gutenberg_metadata  %>% gutenberg_works(language = "en") %>% 
+  filter(str_detect(title, "Pride and Prejudice"))
+
+gutenberg_works(title == "Pride and Prejudice")$gutenberg_id
+
+book <- gutenberg_download(1342)
+words <- book %>% unnest_tokens(word,text)
+nrow(words)
+words <- words %>%  filter(!word %in% stop_words$word ) 
+nrow(words)
+words <- words %>% filter(!str_detect(word, "\\d"))
+words %>% count(word) %>% filter(n>100) %>% arrange(desc(n))
+
+words %>%
+    count(word) %>%
+    top_n(1, n)
+
+afinn <- get_sentiments("afinn")
+```
+```{r}
+library(tidyverse)
+library(pdftools)
+options(digits = 3)
+
 ```
 
 
